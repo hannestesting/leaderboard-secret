@@ -2,7 +2,7 @@
 all: cruncher reorg
 
 cruncher: cruncher.c utils.h 
-	gcc -I. -g -O3 -msse4.1 -march=native -o cruncher cruncher.c # bloom.c MurmurHash2.c -lbz2
+	gcc -I. -O3 -o cruncher cruncher.c # bloom.c MurmurHash2.c -lbz2
 
 loader: loader.c utils.h
 	gcc -I. -O3 -o loader loader.c 
