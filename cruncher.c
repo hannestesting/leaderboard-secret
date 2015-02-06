@@ -9,10 +9,6 @@
 
 #include "utils.h"
 #include "khash.h"
-//#include "bloom.h"
-
-//#include <bzlib.h>
-
 
 #define QUERY_FIELD_QID 0
 #define QUERY_FIELD_A1 1
@@ -21,6 +17,9 @@
 #define QUERY_FIELD_A4 4
 #define QUERY_FIELD_BS 5
 #define QUERY_FIELD_BE 6
+
+#define MARK(K) asm("M."#K":");
+
 
 Person *person_map;
 unsigned int *knows_map;
@@ -62,132 +61,66 @@ void query(unsigned short qid, unsigned short artist, unsigned short areltd[], u
 	bool likesa1 = false;
 	unsigned short interest;
 
+	// init hash table to empirical sizes to avoid resizing them
 	khash_t(pht) *birthdayboys =  kh_init(pht);
+	kh_resize(pht, birthdayboys, 100000);
+
 	khash_t(ft) *a1likers =  kh_init(ft);
+	kh_resize(ft, a1likers, 500000);
 
 	khiter_t k;
 	int kret;
 
-	unsigned int result_length = 0, result_idx, result_set_size = 10000;
+	unsigned int result_length = 0, result_idx, result_set_size = 100000;
 	Result* results = malloc(result_set_size * sizeof (Result));
-	printf("Running query %d\n", qid);
-	// bloom filters were way slower than probing hash table!	
-	// struct bloom birthdayboys_filter;
-	// struct bloom a1likers_filter;
 
-	// bloom_init(&birthdayboys_filter, 100000, 0.1);
-	// bloom_init(&a1likers_filter, 10000, 0.1);
-
-	// TODO: store person as arrays?
-
-	// first pass, find candidates
-
-	// TODO: clean this up
-//	FILE * personfile = fopen("dataset-sf100/person-local.bin", "r");
-//	int bzerror;
-//	BZFILE* personfile = BZ2_bzReadOpen(&bzerror, personfilebz ,0, 0, NULL, 0);
-	//int chunksize = 10000;
-	//Person * personbuf = (Person *) malloc(chunksize * sizeof(Person));
-	//int buffset;
-
-	//int bread;
-	//person_offset = 0;
-
-	// while((bread = BZ2_bzRead(&bzerror, personfile, personbuf, chunksize)) > 0) {
-	// 	for (buffofset = 0; buffofset < bread/sizeof(Person); buffofset++) {
-	// 		person = &personbuf[buffofset];
-			//printf("%lu\n", person->person_id);
-
-	//while ((bread = fread(personbuf, sizeof(Person), chunksize, personfile)) > 0) {
-//		for (buffset = 0; buffset < bread; buffset++) {
-//			person = &personbuf[buffset];
-	// mmap way
 	for (person_offset = 0; person_offset < person_length/sizeof(Person); person_offset++) {
 	 	person = &person_map[person_offset];
 
 		score = 0;
 		likesa1 = false;
 
-		// TODO: also use fread to scan interests?
+		//printf("%d\n", person->interest_n);
 		for (interest_offset = person->interests_first; 
 			interest_offset < person->interests_first + person->interest_n; 
 			interest_offset++) {
-			
+
 			interest = interest_map[interest_offset];
+
 			if (interest == artist) {
 				likesa1 = true;
 				break; // for people who like a1, the score is irrelevant
 			}
-			score += (interest == areltd[0]) + (interest == areltd[1]) + (interest == areltd[2]);
+			if (interest == areltd[0] || interest == areltd[1] || interest == areltd[2]) {
+				score++;
+			}
 		}
-		
-		if (!likesa1 && score > 0 && person->birthday >= bdstart && person->birthday <= bdend) {
-			k = kh_put(pht, birthdayboys, person_offset, &kret);
-			kh_value(birthdayboys, k) = score;
-			//bloom_add(&birthdayboys_filter, &person_offset, sizeof(unsigned int));
-			//			printf("b:%lu\n", person->person_id);
-
-			//continue;
-		}
-
-		if (likesa1) {
-			k = kh_put(ft, a1likers, person_offset, &kret);
-			kh_value(a1likers, k) = person->person_id;
-			//							printf("a:%lu\n", person->person_id);
-
-			//bloom_add(&a1likers_filter, &person_offset, sizeof(unsigned int));
-		}
-		//person_offset++;
-	}
-	//rewind(personfile);
-	//person_offset = 0;
-
-	// TODO: build bloom filters from hash tables
-	// second pass, probe hash table and again hash table
 	
-	// while ((bread = fread(personbuf, sizeof(Person), chunksize, personfile)) > 0) {
-	// 	for (buffset = 0; buffset < bread; buffset++) {
-	// 		person = &personbuf[buffset];
-	// 		//printf("%lu\n", person->person_id);
-
+		if (likesa1) {
+			kh_value(a1likers, kh_put(ft, a1likers, person_offset, &kret)) = person->person_id;
+		} else if (score > 0 && person->birthday >= bdstart && person->birthday <= bdend) {
+			kh_value(birthdayboys, kh_put(pht, birthdayboys, person_offset, &kret)) = score;
+		}
+	}
+	
 	bool mutual;
 
-	for (person_offset = 0; person_offset < person_length/sizeof(Person); person_offset++) {
+	// scan hash table
+	kh_foreach(birthdayboys, person_offset, score, 
 		person = &person_map[person_offset];
-
-		// TODO: bloom filter here?
-
-		// if (!bloom_check(&birthdayboys_filter, &person_offset, sizeof(unsigned int))) {
-		// 	continue;
-		// }
-
-		k = kh_get(pht, birthdayboys, person_offset);
-		//person_offset++;
-
-		if (k == kh_end(birthdayboys)) {
-			continue;
-		}
-		//person = &person_map[person_offset];
-		score = kh_value(birthdayboys, k);
-			//						printf("b:%lu\n", person->person_id);
-
-		// TODO: also use fread to scan knows?
-
-		// check if friend lives in same city and likes artist 
 		for (knows_offset = person->knows_first; 
 			knows_offset < person->knows_first + person->knows_n; 
 			knows_offset++) {
 
+
 			// avoid looking at interests
-			// TODO: bloom filter here?
 			k = kh_get(ft, a1likers, knows_map[knows_offset]);
-			if (k == kh_end(a1likers)) {
+			if (kh_end(a1likers) == k) {
 				continue;
 			}
 
 			mutual = false;
 			// only mutual friendships matter
-			// TODO: do this on the smaller file?
 			knows = &person_map[knows_map[knows_offset]];
 			for (knows_offset2 = knows->knows_first;
 				knows_offset2 < knows->knows_first + knows->knows_n;
@@ -211,7 +144,7 @@ void query(unsigned short qid, unsigned short artist, unsigned short areltd[], u
 			results[result_length].score = score;
 			result_length++;
 		}
-	}
+	)
 
 	// sort result
 	qsort(results, result_length, sizeof(Result), &result_comparator);
