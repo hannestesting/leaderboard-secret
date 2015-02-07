@@ -80,7 +80,7 @@ void query(unsigned short qid, unsigned short artist, unsigned short areltd[], u
 		score = 0;
 		likesa1 = false;
 
-		//printf("%d\n", person->interest_n);
+		printf("%d\n", person->interest_n);
 		for (interest_offset = person->interests_first; 
 			interest_offset < person->interests_first + person->interest_n; 
 			interest_offset++) {
@@ -189,5 +189,6 @@ int main(int argc, char *argv[]) {
 
   	/* run through queries */
 	parse_csv(argv[2], &query_line_handler);
+	fclose(outfile);
 	return 0;
 }
