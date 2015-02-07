@@ -61,6 +61,9 @@ void query(unsigned short qid, unsigned short artist, unsigned short areltd[], u
 	bool likesa1 = false;
 	unsigned short interest;
 
+	printf("Running query %d\n", qid);
+
+
 	// init hash table to empirical sizes to avoid resizing them
 	khash_t(pht) *birthdayboys =  kh_init(pht);
 	kh_resize(pht, birthdayboys, 100000);
