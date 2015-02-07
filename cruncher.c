@@ -63,7 +63,6 @@ void query(unsigned short qid, unsigned short artist, unsigned short areltd[], u
 
 	printf("Running query %d\n", qid);
 
-
 	// init hash table to empirical sizes to avoid resizing them
 	khash_t(pht) *birthdayboys =  kh_init(pht);
 	kh_resize(pht, birthdayboys, 100000);
@@ -99,9 +98,11 @@ void query(unsigned short qid, unsigned short artist, unsigned short areltd[], u
 		}
 	
 		if (likesa1) {
-			kh_value(a1likers, kh_put(ft, a1likers, person_offset, &kret)) = person->person_id;
+			k = kh_put(ft, a1likers, person_offset, &kret);
+			kh_value(a1likers, k) = person->person_id;
 		} else if (score > 0 && person->birthday >= bdstart && person->birthday <= bdend) {
-			kh_value(birthdayboys, kh_put(pht, birthdayboys, person_offset, &kret)) = score;
+			k = kh_put(pht, birthdayboys, person_offset, &kret);
+			kh_value(birthdayboys, k) = score;
 		}
 	}
 	
